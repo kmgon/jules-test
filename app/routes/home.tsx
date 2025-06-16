@@ -1,5 +1,4 @@
 import type { Route } from "./+types/home";
-import { json } from "react-router";
 import { useLoaderData } from "react-router";
 import { ProductCard, type Product } from "../components/product-card";
 
@@ -22,7 +21,7 @@ export async function loader() {
       headers: { "Content-Type": "application/json" },
     });
   }
-  return json({ products: data.products as Product[] });
+  return { products: data.products as Product[] };
 }
 
 export function meta({}: Route.MetaArgs) {
