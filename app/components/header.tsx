@@ -11,6 +11,10 @@ export function Header() {
   const toggleCartPopup = () => {
     setIsCartPopupOpen(!isCartPopupOpen);
   };
+
+  const closeCartPopup = () => {
+    setIsCartPopupOpen(false);
+  };
   const { cartState } = useCart();
   const totalQuantity = cartState.totalQuantity;
 
@@ -74,7 +78,7 @@ export function Header() {
           )}
         </button>
       </header>
-      <CartPopup isOpen={isCartPopupOpen} />
+      <CartPopup isOpen={isCartPopupOpen} onClose={closeCartPopup} />
     </>
   );
 }
