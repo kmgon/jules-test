@@ -1,6 +1,7 @@
 import { useLoaderData, useParams } from "react-router"; // Adjusted to react-router
 import type { ProductDetail } from "../components/product-card"; // Assuming ProductDetail is exported from here
 import RecommendationsWidget from "../components/recommendations-widget";
+import { useCart } from "~/contexts/cart-context";
 
 // Define types for loader params if needed, e.g.
 // interface LoaderParams {
@@ -40,6 +41,9 @@ export async function loader({ params }: { params: { productId: string } }): Pro
 // Component function
 function ProductDetailPage() {
   const product = useLoaderData() as ProductDetail;
+  const { cartState, addToCart, updateQuantity, removeFromCart } = useCart();
+  const cartItem = cartState.items.find(item => item.id === product.id);
+  const currentQuantity = cartItem ? cartItem.quantity : 0;
 
   return (
     <div className="container mx-auto p-4 md:p-8"> {/* Adjusted padding */}
@@ -90,6 +94,39 @@ function ProductDetailPage() {
 
           <p className="text-gray-700 mb-4 leading-relaxed">{product.description}</p>
           <p className="text-sm text-gray-600 mb-4">Stock: {product.stock > 0 ? <span className="text-green-600 font-semibold">{product.stock} available</span> : <span className="text-red-600 font-semibold">Out of Stock</span>}</p>
+
+          {/* Cart Controls */}
+          <div className="my-6"> {/* Increased margin for more separation */}
+            {product.stock > 0 ? ( // Only show cart controls if product is in stock
+              currentQuantity === 0 ? (
+                <button
+                  onClick={() => { addToCart(product); }}
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg text-base transition-colors duration-150"
+                >
+                  Add to Cart
+                </button>
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => { if (currentQuantity === 1) removeFromCart(product.id); else updateQuantity(product.id, currentQuantity - 1); }}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-lg text-base transition-colors duration-150"
+                  >
+                    -
+                  </button>
+                  <span className="text-xl font-semibold text-gray-700">{currentQuantity}</span>
+                  <button
+                    onClick={() => { updateQuantity(product.id, currentQuantity + 1); }}
+                    disabled={currentQuantity >= product.stock}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-lg text-base transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                </div>
+              )
+            ) : (
+              <p className="text-red-600 font-semibold text-lg">Currently Out of Stock</p>
+            )}
+          </div>
 
           <h2 className="text-xl font-semibold text-gray-800 mt-6 mb-3 border-b pb-2">Product Details:</h2>
           <div className="space-y-2 text-sm text-gray-700">
