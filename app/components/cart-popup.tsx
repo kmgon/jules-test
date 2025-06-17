@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface CartProduct {
   id: number;
@@ -22,12 +22,29 @@ interface CartData {
 
 interface CartPopupProps {
   isOpen: boolean;
+  onClose: () => void; // Add this line
 }
 
-const CartPopup: React.FC<CartPopupProps> = ({ isOpen }) => {
+const CartPopup: React.FC<CartPopupProps> = ({ isOpen, onClose }) => {
   const [cartData, setCartData] = useState<CartData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -68,11 +85,20 @@ const CartPopup: React.FC<CartPopupProps> = ({ isOpen }) => {
 
   return (
     <div
-      className={`fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 transition-opacity duration-300 ${
+      className={`fixed top-20 right-4 z-40 transition-opacity duration-300 ${
         isOpen ? 'opacity-100' : 'opacity-0 hidden'
       }`}
     >
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+      <div ref={popupRef} className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative"> {/* Added position: relative */}
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+          aria-label="Close cart"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-6 h-6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
         <h2 className="text-2xl font-semibold mb-4">Your Cart</h2>
         <div className="mb-4 min-h-[100px]"> {/* Added min-h for consistent size */}
           {isLoading && <p className="text-gray-700">Loading...</p>}
