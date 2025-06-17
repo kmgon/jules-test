@@ -1,18 +1,23 @@
-# Welcome to React Router!
+# Project: jules-test
 
-A modern, production-ready template for building full-stack React applications using React Router.
+Jules Test is a sample e-commerce application built with React and React Router. It demonstrates features like product listing, product details, a shopping cart, and recommendations. It uses `dummyjson.com` for product data.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+![logo](app/welcome/logo-light.svg)
 
 ## Features
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+- Displays a list of products with infinite scrolling.
+- Shows detailed product information including images, pricing, reviews, and specifications.
+- Shopping cart functionality (add, update, remove items).
+- Product recommendations.
+- Server-side rendering.
+- Hot Module Replacement (HMR) for development.
+- Asset bundling and optimization.
+- Data loading and mutations with React Router.
+- Written in TypeScript.
+- Styled with TailwindCSS.
+- Example tests with Vitest.
+- [React Router docs](https://reactrouter.com/)
 
 ## Getting Started
 
@@ -82,6 +87,30 @@ Make sure to deploy the output of `npm run build`
 
 This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
 
----
+## Contributing
 
-Built with ❤️ using React Router.
+Contributions are welcome! If you have suggestions or want to improve the project, please feel free to:
+1. Fork the repository.
+2. Create a new branch (`git checkout -b feature/your-feature-name`).
+3. Make your changes.
+4. Commit your changes (`git commit -m 'Add some feature'`).
+5. Push to the branch (`git push origin feature/your-feature-name`).
+6. Open a Pull Request.
+
+## Testing
+
+Run all tests:
+```bash
+npm test
+```
+
+Run tests with UI (Vitest UI):
+```bash
+npm run test:ui
+```
+
+## License
+
+This project is currently not licensed.
+
+Consider adding an open-source license such as the [MIT License](https://opensource.org/licenses/MIT) to define how others can use, modify, and distribute your code. If you add a `LICENSE` file to the root of your project, you can link to it here.
