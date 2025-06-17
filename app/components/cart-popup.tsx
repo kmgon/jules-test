@@ -1,34 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { useCart } from '~/contexts/cart-context'; // Adjusted path
 
-interface CartProduct {
-  id: number;
-  title: string;
-  price: number;
-  quantity: number;
-  total: number;
-  discountPercentage: number;
-  discountedPrice: number; // Corrected based on typical API response, might be discountedTotal or similar
-}
-
-interface CartData {
-  id: number;
-  products: CartProduct[];
-  total: number;
-  discountedTotal: number;
-  userId: number;
-  totalProducts: number;
-  totalQuantity: number;
-}
+// Interfaces like CartProduct and CartData are no longer needed here
+// as cartState from useCart will provide the data structure.
+// We will rely on CartItem from cart-context.
 
 interface CartPopupProps {
   isOpen: boolean;
-  onClose: () => void; // Add this line
+  onClose: () => void;
 }
 
 const CartPopup: React.FC<CartPopupProps> = ({ isOpen, onClose }) => {
-  const [cartData, setCartData] = useState<CartData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { cartState, loading: cartLoading } = useCart();
   const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,50 +29,49 @@ const CartPopup: React.FC<CartPopupProps> = ({ isOpen, onClose }) => {
     };
   }, [isOpen, onClose]);
 
-  useEffect(() => {
-    if (isOpen) {
-      const fetchCartData = async () => {
-        setIsLoading(true);
-        setError(null); // Reset error state on new fetch attempt
-        try {
-          const response = await fetch('https://dummyjson.com/carts/1');
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          const data: CartData = await response.json();
-          setCartData(data);
-        } catch (e) {
-          console.error("Failed to fetch cart data:", e);
-          setError(e instanceof Error ? e.message : String(e));
-          setCartData(null); // Clear cart data on error
-        } finally {
-          setIsLoading(false);
-        }
-      };
+  // Removed local fetchCartData useEffect
 
-      fetchCartData();
-    }
-  }, [isOpen]);
+  // Calculate totals from cartState.items
+  // Note: cartState.items are of type CartItem from cart-context.tsx
+  // CartItem currently has: id, quantity, price (original unit), title, thumbnail, stock.
+  // It does *not* have discountedPrice per item line.
+  // So, currentDiscountedTotalAmount will be same as currentTotalAmount until CartItem is updated.
+
+  const totalProductsCount = cartState.items.length;
+  const currentTotalAmount = cartState.items.reduce(
+    (acc, item) => acc + item.price * item.quantity,
+    0
+  );
+
+  // Placeholder for discounted total. Will effectively be the same as currentTotalAmount
+  // if item.discountedPrice is not available on CartItem.
+  // The API returns `discountedPrice` as the total for the line item.
+  const currentDiscountedTotalAmount = cartState.items.reduce(
+    (acc, item) => acc + ((item as any).discountedPrice || item.price * item.quantity),
+    0
+  );
+
 
   const handleBuyButtonClick = () => {
-    if (cartData) {
-      console.log("Buy button clicked. Cart data:", cartData);
-      // Here you would typically proceed with the checkout process,
-      // e.g., sending the cartData to a backend API, redirecting to a payment page, etc.
-      alert(`Processing purchase for ${cartData.totalProducts} product(s) with a total of $${cartData.discountedTotal.toFixed(2)}.`);
+    if (cartState.items.length > 0) {
+      console.log("Buy button clicked. Cart state:", cartState);
+      alert(
+        `Processing purchase for ${totalProductsCount} product type(s) (total ${cartState.totalQuantity} items) with a total of $${currentDiscountedTotalAmount.toFixed(2)}.`
+      );
     } else {
-      console.log("Buy button clicked, but no cart data to process.");
-      alert("Your cart is empty or data could not be loaded.");
+      console.log("Buy button clicked, but cart is empty.");
+      alert("Your cart is empty.");
     }
   };
 
   return (
     <div
+      data-testid="cart-popup-container" // Added data-testid for easier selection in tests
       className={`fixed top-20 right-4 z-40 transition-opacity duration-300 ${
-        isOpen ? 'opacity-100' : 'opacity-0 hidden'
+        isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none' // Added pointer-events-none when hidden
       }`}
     >
-      <div ref={popupRef} className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative"> {/* Added position: relative */}
+      <div ref={popupRef} className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative">
         <button
           onClick={onClose}
           className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
@@ -100,42 +82,45 @@ const CartPopup: React.FC<CartPopupProps> = ({ isOpen, onClose }) => {
           </svg>
         </button>
         <h2 className="text-2xl font-semibold mb-4">Your Cart</h2>
-        <div className="mb-4 min-h-[100px]"> {/* Added min-h for consistent size */}
-          {isLoading && <p className="text-gray-700">Loading...</p>}
-          {error && <p className="text-red-500">Error: {error}</p>}
-          {!isLoading && !error && cartData && (
+        <div className="mb-4 min-h-[100px]">
+          {cartLoading && <p className="text-gray-700">Loading cart...</p>}
+          {!cartLoading && cartState.items.length === 0 && (
+            <p>Your cart is currently empty.</p>
+          )}
+          {!cartLoading && cartState.items.length > 0 && (
             <div>
               <p className="text-gray-700">
-                Total Products: <span className="font-semibold">{cartData.totalProducts}</span>
+                Total Product Types: <span className="font-semibold">{totalProductsCount}</span>
               </p>
               <p className="text-gray-700">
-                Total Quantity: <span className="font-semibold">{cartData.totalQuantity}</span>
+                Total Quantity of Items: <span className="font-semibold">{cartState.totalQuantity}</span>
               </p>
               <p className="text-gray-700">
-                Total Amount: <span className="font-semibold">${cartData.total.toFixed(2)}</span>
+                Total Amount: <span className="font-semibold">${currentTotalAmount.toFixed(2)}</span>
               </p>
               <p className="text-green-600">
-                Discounted Total: <span className="font-semibold">${cartData.discountedTotal.toFixed(2)}</span>
+                Discounted Total: <span className="font-semibold">${currentDiscountedTotalAmount.toFixed(2)}</span>
               </p>
-              {/* Placeholder for individual cart items list */}
               <div className="mt-2 border-t pt-2">
                 <h3 className="text-lg font-medium mb-1">Items:</h3>
-                {cartData.products.map(item => (
+                {cartState.items.map(item => (
                   <div key={item.id} className="text-sm text-gray-600">
-                    {item.title} (x{item.quantity}) - ${item.discountedPrice?.toFixed(2) ?? item.price.toFixed(2)}
+                    {item.title} (x{item.quantity}) - ${
+                      // Attempt to use discountedPrice if it exists on item (it doesn't on CartItem yet)
+                      // API's discountedPrice is total for line. Our CartItem.price is unit.
+                      ((item as any).discountedPrice || item.price * item.quantity).toFixed(2)
+                    }
                   </div>
                 ))}
               </div>
             </div>
           )}
-          {!isLoading && !error && !cartData && (
-            <p>Your cart is currently empty or data could not be loaded.</p>
-          )}
+          {/* Removed the specific error display from local state, context might handle errors globally */}
         </div>
         <button
           onClick={handleBuyButtonClick}
           className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
-          disabled={isLoading || !cartData}
+          disabled={cartLoading || cartState.items.length === 0}
         >
           Buy
         </button>

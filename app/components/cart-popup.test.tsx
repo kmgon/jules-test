@@ -1,187 +1,219 @@
-import React from 'react';
+import React, { type ReactNode } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CartPopup from './cart-popup'; // Adjust path as necessary
-
-const mockCartDataSuccess = {
-  id: 1,
-  products: [
-    { id: 1, title: 'iPhone 9', price: 549, quantity: 1, total: 549, discountPercentage: 12.96, discountedPrice: 478 },
-    { id: 2, title: 'Samsung Universe 9', price: 1249, quantity: 2, total: 2498, discountPercentage: 15.46, discountedPrice: 2112 },
-  ],
-  total: 3047,
-  discountedTotal: 2590,
-  userId: 1,
-  totalProducts: 2,
-  totalQuantity: 3,
-};
-
-// Mock global fetch
-global.fetch = vi.fn();
+import { CartContext, type CartContextType, type CartState, type CartItem } from '../contexts/cart-context'; // Assuming path
 
 // Mock console.log and window.alert
 const consoleLogSpy = vi.spyOn(console, 'log');
-const windowAlertSpy = vi.spyOn(window, 'alert');
+const windowAlertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {}); // Mock alert to avoid actual popups
 
-describe('CartPopup Component', () => {
+// Mock CartItem data adhering to the new structure
+const mockCartItem1: CartItem = {
+  id: 1,
+  title: 'iPhone 9',
+  price: 549, // unit price
+  quantity: 1,
+  stock: 5,
+  thumbnail: 'iphone.jpg',
+  total: 549, // price * quantity
+  discountPercentage: 12.96,
+  discountedPrice: 478, // discounted total for line item
+};
+
+const mockCartItem2: CartItem = {
+  id: 2,
+  title: 'Samsung Universe 9',
+  price: 1249, // unit price
+  quantity: 2,
+  stock: 3,
+  thumbnail: 'samsung.jpg',
+  total: 2498, // price * quantity
+  discountPercentage: 15.46,
+  discountedPrice: 2112, // discounted total for line item
+};
+
+interface MockCartProviderProps {
+  children: ReactNode;
+  mockValue: Partial<CartContextType>;
+}
+
+// Helper to create a mock CartProvider
+const MockCartProvider: React.FC<MockCartProviderProps> = ({ children, mockValue }) => {
+  const defaultCartState: CartState = {
+    items: [],
+    totalQuantity: 0,
+    cartId: null,
+  };
+
+  const defaultValue: CartContextType = {
+    cartState: defaultCartState,
+    addToCart: vi.fn(),
+    removeFromCart: vi.fn(),
+    updateQuantity: vi.fn(),
+    clearCart: vi.fn(),
+    loading: false,
+    ...mockValue, // Override defaults with provided mockValue
+  };
+
+  return <CartContext.Provider value={defaultValue}>{children}</CartContext.Provider>;
+};
+
+
+describe('CartPopup Component (Contextual)', () => {
   beforeEach(() => {
-    // Reset mocks before each test
     vi.clearAllMocks();
-    // Default successful fetch mock
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockCartDataSuccess,
-    } as Response);
   });
 
   afterEach(() => {
-    // Restore any spied functions
-     vi.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
+  const renderWithMockContext = (mockContextValue: Partial<CartContextType>, popupProps = { isOpen: true, onClose: vi.fn() }) => {
+    return render(
+      <MockCartProvider mockValue={mockContextValue}>
+        <CartPopup {...popupProps} />
+      </MockCartProvider>
+    );
+  };
+
   it('is not visible when isOpen is false', () => {
-    render(<CartPopup isOpen={false} />);
-    // The main div has opacity-0 and hidden when not open
-    // We can check for the presence of these classes or that it's not visible.
-    // Checking for 'hidden' class is more direct for Tailwind.
-    const popupDiv = screen.getByRole('dialog', { hidden: true }); //getByRole dialog is not ideal, using testid might be better
-    expect(popupDiv).toHaveClass('opacity-0', 'hidden');
+    // Use default empty cart state for this test, isOpen is the key
+    renderWithMockContext({ cartState: { items: [], totalQuantity: 0, cartId: null }, loading: false }, { isOpen: false, onClose: vi.fn() });
+    // The main div has opacity-0 and pointer-events-none when not open.
+    // We target the outer div. Let's add a test-id to CartPopup's outer div.
+    // For now, let's check for a high-level element.
+    // If CartPopup renders null or nothing when !isOpen, this test needs adjustment.
+    // Based on current CartPopup, it renders a div with classes.
+    const popupContainer = screen.getByTestId('cart-popup-container'); // Assuming you add data-testid="cart-popup-container" to the outer div of CartPopup
+    expect(popupContainer).toHaveClass('opacity-0', 'pointer-events-none');
   });
 
   it('becomes visible when isOpen is true', () => {
-    render(<CartPopup isOpen={true} />);
-    const popupDiv = screen.getByRole('dialog', { hidden: true }); //getByRole dialog is not ideal, using testid might be better
-    expect(popupDiv).not.toHaveClass('hidden');
-    expect(popupDiv).toHaveClass('opacity-100');
+    renderWithMockContext({ cartState: { items: [], totalQuantity: 0, cartId: null }, loading: false });
+    const popupContainer = screen.getByTestId('cart-popup-container');
+    expect(popupContainer).not.toHaveClass('pointer-events-none');
+    expect(popupContainer).toHaveClass('opacity-100');
   });
 
-  it('displays a "Loading..." message when opening and before fetch resolves', async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockImplementationOnce(() =>
-      new Promise(resolve => setTimeout(() => resolve({
-        ok: true,
-        json: async () => mockCartDataSuccess,
-      } as Response), 100)) // Delay resolution
-    );
-    render(<CartPopup isOpen={true} />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+  it('displays "Loading cart..." when cartLoading from context is true', () => {
+    renderWithMockContext({ loading: true });
+    expect(screen.getByText('Loading cart...')).toBeInTheDocument();
   });
 
-  it('displays cart data after fetch resolves successfully', async () => {
-    render(<CartPopup isOpen={true} />);
-    await waitFor(() => {
-      expect(screen.getByText(`Total Products:`)).toBeInTheDocument();
-      expect(screen.getByText(mockCartDataSuccess.totalProducts.toString())).toBeInTheDocument();
-      expect(screen.getByText(`Total Amount:`)).toBeInTheDocument();
-      expect(screen.getByText(`$${mockCartDataSuccess.total.toFixed(2)}`)).toBeInTheDocument();
-      expect(screen.getByText(mockCartDataSuccess.products[0].title)).toBeInTheDocument();
-      expect(screen.getByText(mockCartDataSuccess.products[1].title)).toBeInTheDocument();
-    });
+  it('displays "Your cart is currently empty." when cart is empty and not loading', () => {
+    renderWithMockContext({ cartState: { items: [], totalQuantity: 0, cartId: 1 }, loading: false });
+    expect(screen.getByText('Your cart is currently empty.')).toBeInTheDocument();
   });
 
-  it('displays an error message if fetch fails', async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network error'));
-    render(<CartPopup isOpen={true} />);
-    await waitFor(() => {
-      expect(screen.getByText(/Error: Network error/i)).toBeInTheDocument();
-    });
-  });
-
-  it('displays an error message if fetch response is not ok', async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      json: async () => ({ message: 'Server Error' }),
-    } as Response);
-    render(<CartPopup isOpen={true} />);
-    await waitFor(() => {
-      expect(screen.getByText(/Error: HTTP error! status: 500/i)).toBeInTheDocument();
-    });
-  });
-
-  describe('Buy Button Interactions', () => {
-    beforeEach(() => {
-        // Ensure spies are fresh for these specific tests if needed, though global beforeEach handles it.
-        // consoleLogSpy.mockClear(); // Already done by vi.clearAllMocks()
-        // windowAlertSpy.mockClear(); // Already done by vi.clearAllMocks()
+  it('displays cart items and calculated totals correctly', () => {
+    const mockItems = [mockCartItem1, mockCartItem2];
+    const mockTotalQuantity = mockItems.reduce((sum, item) => sum + item.quantity, 0);
+    renderWithMockContext({
+      cartState: { items: mockItems, totalQuantity: mockTotalQuantity, cartId: 1 },
+      loading: false,
     });
 
-    it('logs cart data and alerts on "Buy" button click after successful data load', async () => {
-      render(<CartPopup isOpen={true} />);
-      await waitFor(() => expect(screen.getByText('Total Products:')).toBeInTheDocument()); // Ensure data is loaded
+    // Check item 1
+    expect(screen.getByText(`${mockCartItem1.title} (x${mockCartItem1.quantity}) - $${mockCartItem1.discountedPrice.toFixed(2)}`)).toBeInTheDocument();
+    // Check item 2
+    expect(screen.getByText(`${mockCartItem2.title} (x${mockCartItem2.quantity}) - $${mockCartItem2.discountedPrice.toFixed(2)}`)).toBeInTheDocument();
 
+    // Check calculated totals (as per CartPopup's internal calculations)
+    const expectedTotalProductsCount = mockItems.length;
+    const expectedCurrentTotalAmount = mockItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    // In CartPopup, currentDiscountedTotalAmount uses item.discountedPrice (which is line total)
+    const expectedCurrentDiscountedTotalAmount = mockItems.reduce((acc, item) => acc + item.discountedPrice, 0);
+
+
+    expect(screen.getByText('Total Product Types:')).toBeInTheDocument();
+    expect(screen.getByText(String(expectedTotalProductsCount))).toBeInTheDocument();
+
+    expect(screen.getByText('Total Quantity of Items:')).toBeInTheDocument();
+    expect(screen.getByText(String(mockTotalQuantity))).toBeInTheDocument(); // This comes directly from cartState.totalQuantity
+
+    expect(screen.getByText('Total Amount:')).toBeInTheDocument();
+    expect(screen.getByText(`$${expectedCurrentTotalAmount.toFixed(2)}`)).toBeInTheDocument();
+
+    expect(screen.getByText('Discounted Total:')).toBeInTheDocument();
+    expect(screen.getByText(`$${expectedCurrentDiscountedTotalAmount.toFixed(2)}`)).toBeInTheDocument();
+  });
+
+
+  describe('Buy Button Interactions (Contextual)', () => {
+    it('Buy button is disabled when cartLoading is true', () => {
+      renderWithMockContext({ loading: true, cartState: { items: [mockCartItem1], totalQuantity: 1, cartId: 1 } });
+      const buyButton = screen.getByRole('button', { name: /Buy/i });
+      expect(buyButton).toBeDisabled();
+    });
+
+    it('Buy button is disabled when cart is empty and not loading', () => {
+      renderWithMockContext({ loading: false, cartState: { items: [], totalQuantity: 0, cartId: 1 } });
+      const buyButton = screen.getByRole('button', { name: /Buy/i });
+      expect(buyButton).toBeDisabled();
+    });
+
+    it('Buy button is enabled when cart has items and not loading', () => {
+      renderWithMockContext({ loading: false, cartState: { items: [mockCartItem1], totalQuantity: 1, cartId: 1 } });
       const buyButton = screen.getByRole('button', { name: /Buy/i });
       expect(buyButton).not.toBeDisabled();
-      fireEvent.click(buyButton);
-
-      expect(consoleLogSpy).toHaveBeenCalledWith("Buy button clicked. Cart data:", mockCartDataSuccess);
-      expect(windowAlertSpy).toHaveBeenCalledWith(`Processing purchase for ${mockCartDataSuccess.totalProducts} product(s) with a total of $${mockCartDataSuccess.discountedTotal.toFixed(2)}.`);
     });
 
-    it('logs "no cart data" and alerts on "Buy" button click if data load failed', async () => {
-      (fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Failed to load'));
-      render(<CartPopup isOpen={true} />);
+    it('logs correct data and alerts on "Buy" button click', () => {
+      const mockItems = [mockCartItem1];
+      const mockTotalQuantity = mockCartItem1.quantity;
+      const mockCartId = 123;
 
-      await waitFor(() => expect(screen.getByText(/Error: Failed to load/i)).toBeInTheDocument()); // Ensure error is shown
+      renderWithMockContext({
+        cartState: { items: mockItems, totalQuantity: mockTotalQuantity, cartId: mockCartId },
+        loading: false,
+      });
 
       const buyButton = screen.getByRole('button', { name: /Buy/i });
-      // Button should be disabled if cartData is null (which it will be after an error)
-      expect(buyButton).toBeDisabled();
+      fireEvent.click(buyButton);
 
-      // To test the click handler's logic for no data, we'd have to enable the button,
-      // or the component logic would need to change.
-      // However, the prompt asks to test "When the "Buy" button is clicked and there's no cart data (or an error occurred)"
-      // Since it's disabled on error, we can't directly click it in that state.
-      // We'll assume the test implies that if it *could* be clicked in such a state, this would be the behavior.
-      // Or, more practically, we're testing the state where it *is* clickable but cartData somehow becomes null.
-      // For now, let's test that it's disabled. If the requirement is to test the branches of handleBuyButtonClick
-      // even when the button is normally disabled, the test or component might need adjustment.
+      const totalProductsCount = mockItems.length;
+      // currentDiscountedTotalAmount in CartPopup uses item.discountedPrice (which is line total)
+      const currentDiscountedTotalAmount = mockItems.reduce((acc, item) => acc + item.discountedPrice, 0);
 
-      // Simulating a click on a disabled button won't trigger the handler.
-      // Instead, we can verify the disabled state.
-      // If we wanted to test the function directly:
-      // const instance = new CartPopup({ isOpen: true }); // This is not how RTL works
-      // instance.handleBuyButtonClick(); // This would be for class components or direct function call
-      // For this component, the button being disabled is the correct behavior.
-
-      // The prompt seems to imply testing the branches of `handleBuyButtonClick`.
-      // Let's assume `handleBuyButtonClick` could be called even if button is disabled (e.g. by tests).
-      // Or, let's assume a state where button is enabled but data is bad.
-      // Given the current implementation, if an error occurs, cartData is null, and button is disabled.
-      // So, the "Buy button click (No Data)" scenario as described (clicking when no data after error) is not possible.
-      // What we *can* test is the state *before* data is loaded (button disabled) or *after* error (button disabled).
-
-      // Let's re-evaluate: The `handleBuyButtonClick` itself has branches.
-      // The button is disabled if !cartData. So, we can only test the `else` branch of `handleBuyButtonClick`
-      // if we were to call it directly, or if there was a scenario where `cartData` is null but button is not disabled.
-      // The current component logic correctly disables the button.
-      // So, for "Buy Button Click (No Data)", the most relevant test is that the button is disabled.
-
-      // If the intention was to test the console/alert when cartData is null *and the button is somehow clicked*,
-      // that would require a different setup.
-      // The current test will verify it's disabled after an error.
-      expect(buyButton).toBeDisabled();
-
-      // To satisfy the prompt's request to check console.log for "no cart data":
-      // We can manually call the handler after setting up a state where cartData is null.
-      // This is a bit artificial but tests the handler's branches.
-      // We need to get access to the handler or simulate a component state.
-      // This is getting complicated for a standard RTL test.
-
-      // Let's keep it simple: button is disabled.
-      // If the user *could* click it (e.g. if disabled attribute was missing):
-      // fireEvent.click(buyButton); // This wouldn't run the onClick if button is programmatically disabled.
-      // expect(consoleLogSpy).toHaveBeenCalledWith("Buy button clicked, but no cart data to process.");
-      // expect(windowAlertSpy).toHaveBeenCalledWith("Your cart is empty or data could not be loaded.");
-      // This part of the test might need to be rethought based on how strictly "unit" the test for handleBuyButtonClick should be.
+      expect(consoleLogSpy).toHaveBeenCalledWith("Buy button clicked. Cart state:", {
+        items: mockItems,
+        totalQuantity: mockTotalQuantity,
+        cartId: mockCartId
+      });
+      expect(windowAlertSpy).toHaveBeenCalledWith(
+        `Processing purchase for ${totalProductsCount} product type(s) (total ${mockTotalQuantity} items) with a total of $${currentDiscountedTotalAmount.toFixed(2)}.`
+      );
     });
+  });
 
-     it('Buy button is disabled initially when isOpen is true and data is not yet loaded', () => {
-        (fetch as ReturnType<typeof vi.fn>).mockImplementationOnce(() => new Promise(() => {})); // Never resolves
-        render(<CartPopup isOpen={true} />);
-        const buyButton = screen.getByRole('button', { name: /Buy/i });
-        expect(buyButton).toBeDisabled();
-        expect(screen.getByText('Loading...')).toBeInTheDocument(); // Confirms it's in loading state
-    });
+  it('calls onClose when the close button is clicked', () => {
+    const mockOnClose = vi.fn();
+    renderWithMockContext(
+      { cartState: { items: [], totalQuantity: 0, cartId: null }, loading: false },
+      { isOpen: true, onClose: mockOnClose }
+    );
+    const closeButton = screen.getByRole('button', { name: /Close cart/i });
+    fireEvent.click(closeButton);
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+
+  // Test for handleClickOutside is more complex and often considered an integration detail.
+  // Basic check: if popup is open, clicking outside calls onClose.
+  it('calls onClose when clicking outside the popup', () => {
+    const mockOnClose = vi.fn();
+    // Render the component within a container to simulate "outside"
+    const { container } = render(
+      <div>
+        <div data-testid="outside-area">Outside</div>
+        <MockCartProvider mockValue={{ cartState: { items: [], totalQuantity: 0, cartId: null }, loading: false }}>
+          <CartPopup isOpen={true} onClose={mockOnClose} />
+        </MockCartProvider>
+      </div>
+    );
+
+    // Clicking on an element clearly outside the popup content
+    fireEvent.mouseDown(screen.getByTestId('outside-area'));
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 });
