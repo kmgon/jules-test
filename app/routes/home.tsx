@@ -34,8 +34,8 @@ export async function loader() {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
+    { title: "KM Shop | Jules Demo" },
+    { name: "description", content: "Welcome to Jules Demo" },
   ];
 }
 
