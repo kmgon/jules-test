@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'; // Using react-router-dom for Link
+import { Link } from 'react-router';
 
 export interface Product {
   id: number;
@@ -38,7 +38,7 @@ interface ProductCardProps {
   product: Product;
 }
 
-function renderStars(rating: number): JSX.Element[] {
+function renderStars(rating: number): React.ReactNode[] {
   const stars = [];
   const roundedRating = Math.round(rating);
   for (let i = 0; i < 5; i++) {
