@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useContext, type ReactNode } from 'react';
 import type { Product } from '../components/product-card';
 
 // Define Interfaces
@@ -473,26 +473,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const addToCart = (product: Product, quantity: number = 1) => {
-    // Placeholder
-    console.log('addToCart called with', product, quantity);
-  };
-
-  const removeFromCart = (productId: number) => {
-    // Placeholder
-    console.log('removeFromCart called with', productId);
-  };
-
-  const updateQuantity = (productId: number, quantity: number) => {
-    // Placeholder
-    console.log('updateQuantity called with', productId, quantity);
-  };
-
-  const clearCart = () => {
-    // Placeholder
-    console.log('clearCart called');
   };
 
   return (
