@@ -114,10 +114,17 @@ describe('CartPopup Component (Contextual)', () => {
       loading: false,
     });
 
-    // Check item 1
-    expect(screen.getByText(`${mockCartItem1.title} (x${mockCartItem1.quantity}) - $${mockCartItem1.discountedPrice.toFixed(2)}`)).toBeInTheDocument();
-    // Check item 2
-    expect(screen.getByText(`${mockCartItem2.title} (x${mockCartItem2.quantity}) - $${mockCartItem2.discountedPrice.toFixed(2)}`)).toBeInTheDocument();
+    // Check item 1 title and price (quantity is now separate)
+    expect(screen.getByText(mockCartItem1.title)).toBeInTheDocument();
+    expect(screen.getAllByText(`$${mockCartItem1.discountedPrice.toFixed(2)}`)[0]).toBeInTheDocument(); // Ensure it's the item price
+    expect(screen.getByLabelText(`Decrease quantity of ${mockCartItem1.title}`)).toBeInTheDocument();
+    expect(screen.getByText(`Qty: ${mockCartItem1.quantity}`)).toBeInTheDocument();
+
+    // Check item 2 title and price
+    expect(screen.getByText(mockCartItem2.title)).toBeInTheDocument();
+    expect(screen.getAllByText(`$${mockCartItem2.discountedPrice.toFixed(2)}`)[0]).toBeInTheDocument(); // Ensure it's the item price
+    expect(screen.getByLabelText(`Decrease quantity of ${mockCartItem2.title}`)).toBeInTheDocument();
+    expect(screen.getByText(`Qty: ${mockCartItem2.quantity}`)).toBeInTheDocument();
 
     // Check calculated totals (as per CartPopup's internal calculations)
     const expectedTotalProductsCount = mockItems.length;
@@ -215,5 +222,111 @@ describe('CartPopup Component (Contextual)', () => {
     // Clicking on an element clearly outside the popup content
     fireEvent.mouseDown(screen.getByTestId('outside-area'));
     expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Quantity Adjustments and Item Removal', () => {
+    const mockUpdateQuantity = vi.fn();
+    const mockRemoveFromCart = vi.fn();
+
+    beforeEach(() => {
+      mockUpdateQuantity.mockClear();
+      mockRemoveFromCart.mockClear();
+    });
+
+    const cartWithItems: CartItem[] = [
+      { ...mockCartItem1, id: 101, quantity: 1, title: "Single Item" }, // Item with quantity 1
+      { ...mockCartItem2, id: 102, quantity: 3, title: "Multiple Item" }, // Item with quantity > 1
+    ];
+    const mockCartStateWithItems: CartState = {
+      items: cartWithItems,
+      totalQuantity: cartWithItems.reduce((sum, item) => sum + item.quantity, 0),
+      cartId: 1,
+    };
+
+    it('increments quantity when "+" button is clicked', () => {
+      renderWithMockContext({
+        cartState: mockCartStateWithItems,
+        updateQuantity: mockUpdateQuantity,
+        removeFromCart: mockRemoveFromCart, // Add to ensure it's not called
+        loading: false,
+      });
+
+      const itemToIncrement = cartWithItems[1]; // Multiple Item (qty: 3)
+      const incrementButton = screen.getByLabelText(`Increase quantity of ${itemToIncrement.title}`);
+      fireEvent.click(incrementButton);
+
+      expect(mockUpdateQuantity).toHaveBeenCalledTimes(1);
+      expect(mockUpdateQuantity).toHaveBeenCalledWith(itemToIncrement.id, itemToIncrement.quantity + 1);
+      expect(mockRemoveFromCart).not.toHaveBeenCalled();
+    });
+
+    it('decrements quantity when "-" button is clicked for item with quantity > 1', () => {
+      renderWithMockContext({
+        cartState: mockCartStateWithItems,
+        updateQuantity: mockUpdateQuantity,
+        removeFromCart: mockRemoveFromCart,
+        loading: false,
+      });
+
+      const itemToDecrement = cartWithItems[1]; // Multiple Item (qty: 3)
+      const decrementButton = screen.getByLabelText(`Decrease quantity of ${itemToDecrement.title}`);
+      fireEvent.click(decrementButton);
+
+      expect(mockUpdateQuantity).toHaveBeenCalledTimes(1);
+      expect(mockUpdateQuantity).toHaveBeenCalledWith(itemToDecrement.id, itemToDecrement.quantity - 1);
+      expect(mockRemoveFromCart).not.toHaveBeenCalled();
+    });
+
+    it('calls removeFromCart when "-" button is clicked for item with quantity = 1', () => {
+      renderWithMockContext({
+        cartState: mockCartStateWithItems,
+        updateQuantity: mockUpdateQuantity,
+        removeFromCart: mockRemoveFromCart,
+        loading: false,
+      });
+
+      const itemToRemove = cartWithItems[0]; // Single Item (qty: 1)
+      const decrementButton = screen.getByLabelText(`Decrease quantity of ${itemToRemove.title}`);
+      fireEvent.click(decrementButton);
+
+      expect(mockRemoveFromCart).toHaveBeenCalledTimes(1);
+      expect(mockRemoveFromCart).toHaveBeenCalledWith(itemToRemove.id);
+      expect(mockUpdateQuantity).not.toHaveBeenCalled();
+    });
+
+    it('calls removeFromCart when "Remove" button is clicked', () => {
+      renderWithMockContext({
+        cartState: mockCartStateWithItems,
+        updateQuantity: mockUpdateQuantity,
+        removeFromCart: mockRemoveFromCart,
+        loading: false,
+      });
+
+      const itemToRemove = cartWithItems[1]; // Multiple Item (qty: 3)
+      const removeButton = screen.getByLabelText(`Remove ${itemToRemove.title} from cart`);
+      fireEvent.click(removeButton);
+
+      expect(mockRemoveFromCart).toHaveBeenCalledTimes(1);
+      expect(mockRemoveFromCart).toHaveBeenCalledWith(itemToRemove.id);
+      expect(mockUpdateQuantity).not.toHaveBeenCalled();
+    });
+
+    // Test "Remove" button for an item with quantity 1 as well, for completeness
+    it('calls removeFromCart when "Remove" button is clicked for item with quantity = 1', () => {
+      renderWithMockContext({
+        cartState: mockCartStateWithItems,
+        updateQuantity: mockUpdateQuantity,
+        removeFromCart: mockRemoveFromCart,
+        loading: false,
+      });
+
+      const itemToRemove = cartWithItems[0]; // Single Item (qty: 1)
+      const removeButton = screen.getByLabelText(`Remove ${itemToRemove.title} from cart`);
+      fireEvent.click(removeButton);
+
+      expect(mockRemoveFromCart).toHaveBeenCalledTimes(1);
+      expect(mockRemoveFromCart).toHaveBeenCalledWith(itemToRemove.id);
+      expect(mockUpdateQuantity).not.toHaveBeenCalled();
+    });
   });
 });

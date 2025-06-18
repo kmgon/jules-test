@@ -11,7 +11,7 @@ interface CartPopupProps {
 }
 
 const CartPopup: React.FC<CartPopupProps> = ({ isOpen, onClose }) => {
-  const { cartState, loading: cartLoading } = useCart();
+  const { cartState, loading: cartLoading, updateQuantity, removeFromCart } = useCart();
   const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -104,12 +104,47 @@ const CartPopup: React.FC<CartPopupProps> = ({ isOpen, onClose }) => {
               <div className="mt-2 border-t pt-2">
                 <h3 className="text-lg font-medium mb-1">Items:</h3>
                 {cartState.items.map(item => (
-                  <div key={item.id} className="text-sm text-gray-600">
-                    {item.title} (x{item.quantity}) - ${
-                      // Attempt to use discountedPrice if it exists on item (it doesn't on CartItem yet)
-                      // API's discountedPrice is total for line. Our CartItem.price is unit.
-                      ((item as any).discountedPrice || item.price * item.quantity).toFixed(2)
-                    }
+                  <div key={item.id} className="py-2 border-b border-gray-200 last:border-b-0">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-gray-700">{item.title}</span>
+                      <span className="text-sm text-gray-500">
+                        ${((item as any).discountedPrice || item.price * item.quantity).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center">
+                        <button
+                          onClick={() => {
+                            if (item.quantity > 1) {
+                              updateQuantity(item.id, item.quantity - 1);
+                            } else {
+                              removeFromCart(item.id);
+                            }
+                          }}
+                          className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-xs"
+                          aria-label={`Decrease quantity of ${item.title}`}
+                        >
+                          -
+                        </button>
+                        <span className="mx-2 text-sm text-gray-700" aria-live="polite">
+                          Qty: {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-xs"
+                          aria-label={`Increase quantity of ${item.title}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => removeFromCart(item.id)}
+                        className="ml-2 px-2 py-0.5 bg-red-500 text-white rounded-md hover:bg-red-600 text-xs"
+                        aria-label={`Remove ${item.title} from cart`}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
